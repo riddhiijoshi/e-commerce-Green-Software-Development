@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>User Transactions</title>
+    <link
+      rel="stylesheet"
+      href="{{ url_for('static', filename='css/style.css') }}"
+    />
+    <style>
+      /* CSS styles for the table */
+      table {
+        width: 80%;
+        border-collapse: collapse;
+        margin: 20px auto;
+      }
+
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+      }
+
+      th {
+        background-color: #083344;
+        color: white;
+      }
+
+      tr:nth-child(even) {
+        background-color: #f2f2f2;
+      }
+
+      .yellow-text {
+        color: yellow;
+      }
+
+      /* Styles for the dropdown menu */
+      .dropdown {
+        position: relative;
+        display: inline-block;
+      }
+
+      .dropdown-content {
+        display: none;
+        position: absolute;
+        background-color: #f1f1f1;
+        min-width: 100px;
+        box-shadow: 0 8px 16px 0 rgba(0, 0, 0, 0.2);
+        z-index: 1;
+      }
+
+      .dropdown-content a {
+        color: black;
+        padding: 12px 16px;
+        text-decoration: none;
+        display: block;
+      }
+
+      .dropdown-content a:hover {
+        background-color: #ddd;
+      }
+
+      .show {
+        display: block;
+      }
+
+      /* Styles for the delivery status dropdown */
+      .delivery-status-dropdown {
+        cursor: pointer;
+      }
+    </style>
+  </head>
+  <body>
+    <h1 style="text-align: center">All Transactions</h1>
+
+    <div id="Alltransactions">
+      <!-- Transaction data will be dynamically added here -->
+    </div>
+    <script>
+      document.addEventListener("DOMContentLoaded", () => {
+        // Fetch all transactions from the server
+        async function fetchAllTransactions() {
+          try {
+            const response = await fetch("/all_transactions");
+            if (!response.ok) {
+              throw new Error("Failed to fetch transactions.");
+            }
+            const data = await response.json();
+            return data.transactions;
+          } catch (error) {
+            console.error("Error:", error);
+            return [];
+          }
+        }
+
+        // Function to fetch user name
+        async function fetchUserName(userId) {
+          try {
+            const response = await fetch(`/user_info?user_id=${userId}`);
+            if (!response.ok) {
+              throw new Error("Failed to fetch user name.");
+            }
+            const user_info = await response.json();
+            return user_info.user_info.username;
+          } catch (error) {
+            console.error("Error:", error);
+            return "Unknown";
+          }
+        }
+
+        // Function to display all transactions in the UI
+        async function displayAllTransactions(transactions) {
+          const transactionsContainer =
+            document.getElementById("Alltransactions");
+
+          // Create a table element
+          const table = document.createElement("table");
+
+          // Create table header
+          const headerRow = document.createElement("tr");
+          const headers = [
+            "Transaction ID",
+            "User Name",
+            "Product Name",
+            "Amount",
+            "Description",
+            "Delivery Status",
+          ];
+          headers.forEach((headerText) => {
+            const th = document.createElement("th");
+            th.textContent = headerText;
+            headerRow.appendChild(th);
+          });
+          table.appendChild(headerRow);
+
+          // Create table body
+          transactions.forEach(async (transaction) => {
+            transaction.products.forEach(async (product) => {
+              const row = document.createElement("tr");
+
+              // Transaction ID
+              const transactionIdCell = document.createElement("td");
+              transactionIdCell.textContent = transaction._id;
+              transactionIdCell.classList.add("yellow-text");
+              row.appendChild(transactionIdCell);
+
+              // User Name
+              const userName = await fetchUserName(transaction.user_id);
+              const userNameCell = document.createElement("td");
+              userNameCell.textContent = userName;
+              userNameCell.classList.add("yellow-text");
+              row.appendChild(userNameCell);
+
+              // Product Name
+              const productNameCell = document.createElement("td");
+              productNameCell.textContent = product.name;
+              productNameCell.classList.add("yellow-text");
+              row.appendChild(productNameCell);
+
+              // Amount
+              const amountCell = document.createElement("td");
+              amountCell.textContent = `$${product.price}`;
+              amountCell.classList.add("yellow-text");
+              row.appendChild(amountCell);
+
+              // Description
+              const descriptionCell = document.createElement("td");
+              descriptionCell.textContent = product.description;
+              descriptionCell.classList.add("yellow-text");
+              row.appendChild(descriptionCell);
+
+              // Create delivery status button
+              const deliveryStatusCell = document.createElement("td");
+              const deliveryButton = document.createElement("button");
+              deliveryButton.classList.add("delivery-button");
+
+              console.log(transaction);
+              if (transaction.delivery_status) {
+                // If delivered
+                deliveryButton.textContent = "Delivered";
+                deliveryButton.style.backgroundColor = "green";
+              } else {
+                // If not delivered
+                deliveryButton.textContent = "Not Delivered";
+                deliveryButton.style.backgroundColor = "red";
+              }
+
+              // Add event listener to toggle delivery status
+              deliveryButton.addEventListener("click", async () => {
+                const newStatus = !transaction.delivery_status; // Toggle status
+                await updateDeliveryStatus(transaction._id, newStatus);
+                location.reload(); // Refresh page after updating status
+              });
+
+              deliveryStatusCell.appendChild(deliveryButton);
+              row.appendChild(deliveryStatusCell);
+
+              // Append the row to the table body
+              table.appendChild(row);
+            });
+          });
+
+          // Append the table to the transactions container
+          transactionsContainer.appendChild(table);
+        }
+
+        // Fetch all transactions and display them
+        fetchAllTransactions()
+          .then((transactions) => {
+            displayAllTransactions(transactions);
+          })
+          .catch((error) => {
+            console.error("Error:", error);
+          });
+
+        // Function to update delivery status
+        async function updateDeliveryStatus(transactionId, status) {
+          try {
+            const response = await fetch(
+              `/update_delivery_status?transaction_id=${transactionId}&status=${status}`,
+              {
+                method: "PUT",
+              }
+            );
+            if (!response.ok) {
+              throw new Error("Failed to update delivery status.");
+            }
+            const data = await response.json();
+            console.log(data.message);
+          } catch (error) {
+            console.error("Error:", error);
+          }
+        }
+      });
+    </script>
+  </body>
+</html>
